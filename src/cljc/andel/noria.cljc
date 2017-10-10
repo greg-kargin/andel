@@ -83,6 +83,77 @@
        (map (fn [[n s]] ^{:key n} [style-cmp n s]))
        s)))))
 
+(def scroller-
+  (stateless
+   (fn [{:keys [top height px->idx on-wheel child-cmp child-props] :as props}]
+     (let [childs-children (:children child-props)
+           child-props' (-> child-props
+                            (assoc :from (px->idx top)
+                                   :to   (px->idx (+ top height)))
+                            (dissoc :children))]
+       [:div {:component "scroller"
+              :on-wheel on-wheel}
+        (into [child-cmp child-props'] childs-children)]))))
+
+(def list-
+  (stateless
+   (fn [{:keys [height from to map-fn]} & children]
+     (into [:div {:component "list"
+                  :style (render/style {:flex     "1"
+                                        :overflow :hidden
+                                        :height   height})}]
+           (comp (drop from)
+                 (take (- to from))
+                 (map map-fn))
+           children))))
+
+(def rainbow
+  (comp
+   (should-subtree-update
+    (constantly true))
+   (stateless
+    (fn [top height cb]
+      (let [children (apply concat
+                            (repeat 100 [[:div {:style (render/style {:height "50px"
+                                                                      :width "100%"
+                                                                      :background "red"})}]
+                                         [:div {:style (render/style {:height "50px"
+                                                                      :width "100%"
+                                                                      :background "orange"})}]
+                                         [:div {:style (render/style {:height "50px"
+                                                                      :width "100%"
+                                                                      :background "yellow"})}]
+                                         [:div {:style (render/style {:height "50px"
+                                                                      :width "100%"
+                                                                      :background "green"})}]
+                                         [:div {:style (render/style {:height "50px"
+                                                                      :width "100%"
+                                                                      :background "cyan"})}]
+                                         [:div {:style (render/style {:height "50px"
+                                                                      :width "100%"
+                                                                      :background "blue"})}]
+                                         [:div {:style (render/style {:height "50px"
+                                                                      :width "100%"
+                                                                      :background "purple"})}]]))
+            px->idx (fn [px]
+                      (quot px 50))
+            y-shift (rem top 50)
+            add-translate3d (fn [child]
+                              (update-in child [1 :style]
+                                         #(str %
+                                               "transform: "
+                                               "translate3d(0px,"
+                                               (- y-shift)
+                                               "px,0px);")))]
+        [scroller- {:top top
+                    :height height
+                    :px->idx px->idx
+                    :on-wheel cb
+                    :child-cmp list-
+                    :child-props {:children children
+                                  :map-fn add-translate3d
+                                  :height height}}])))))
+
 (def editor-component
   (comp
    (should-subtree-update
@@ -114,3 +185,23 @@
                              :focused? (get-in state [:viewport :focused?])}]
          [styles-container styles-map]])))))
 
+(comment
+
+  (def map-view
+    (stateless
+     (fn [f coll]
+       (into [:div {:component "map-view"}]
+             (map f coll)))))
+
+  [scroller {:on-scroll (fn [dx dy])
+             :height height}
+   (let [top-item (px->idx (constantly 19) top)
+         bottom-item (px->idx (constantly 19) (+ top height))]
+     [map-view
+      (fn [i]
+        ^{:key (key-fn i)}
+        [translate3d {:y y-shift}
+         (render-fn i)])
+      (range top-item bottom-item)])]
+
+  )
