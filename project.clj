@@ -4,12 +4,12 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :dependencies [[org.clojure/clojure "1.9.0-alpha19"]                 
+  :dependencies [[org.clojure/clojure "1.9.0-alpha19"]
                  [cljsjs/react "16.0.0-beta.5-1"]
                  [cljsjs/react-dom "16.0.0-beta.5-1"]
                  [cljsjs/create-react-class "15.6.0-1"]
                  [reagent "0.7.0"]
-                 [reagent-utils "0.2.1"]                                  
+                 [reagent-utils "0.2.1"]
                  [org.clojure/clojurescript "1.9.908" :scope "provided"]
                  [cljs-http "0.1.43"]
                  [garden "1.3.2"]
@@ -29,7 +29,7 @@
    [:cljsbuild :builds :app :compiler :output-dir]
    [:cljsbuild :builds :app :compiler :output-to]]
 
-  :source-paths ["src/cljc" "src/cljs"]
+  :source-paths ["src/cljc" "src/cljs" "noria-clj/src/clj"]
   :resource-paths ["resources" "target/cljsbuild"]
 
   :minify-assets

@@ -1,0 +1,4 @@
+[submodule "noria-clj"]
+    path = noria-clj
+    url = git@github.com:JetBrains/noria-clj.git
+    branch = master

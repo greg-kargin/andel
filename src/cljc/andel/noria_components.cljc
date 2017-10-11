@@ -1,33 +1,12 @@
-(ns andel.noria
+(ns andel.noria-components
   (:require [andel.render :as render]
-            [andel.theme :as theme])
+            [andel.theme :as theme]
+            [andel.utils :as utils]
+            [noria.components :as components])
   (:import [andel.render LineInfo]))
 
-(defn should-subtree-update [pred]
-  (fn [r-f]
-    (fn
-      ([] {:s (r-f)
-           :args nil})
-      ([state & args]
-       (if (or (nil? (:args state)) (pred args (:args state)))
-         {:s (apply r-f (:s state) args)
-          :args args}
-         state))
-      ([state] (r-f (:s state))))))
-
-(defn stateless [render-fn]
-  (fn [r-f]
-    (fn
-      ([] (r-f))
-      ([state & args]
-       (r-f state (apply render-fn args)))
-      ([state] state))))
-
-(defn pure []
-  (should-subtree-update not=))
-
 (def scroll
-  (stateless
+  (components/render
    (fn [{:keys [on-wheel child]}]
      [:div {:style (render/style {:display  "flex"
                                   :flex     "1"
@@ -37,11 +16,11 @@
 
 (def render-line
   (comp
-   (should-subtree-update
+   (components/should-subtree-update
     (fn [[props metrics] [props' metrics']]
       (or (not= metrics metrics')
           (not (render/line-props-equiv? props props')))))
-   (stateless
+   (components/render
     (fn [props metrics]
       (let [^LineInfo line-info (render/build-line-info props)
             selection (.-selection line-info)
@@ -67,16 +46,16 @@
 
 (def style-cmp
   (comp
-   (should-subtree-update (constantly false))
-   (stateless
+   (components/should-subtree-update (constantly false))
+   (components/render
     (fn [name style]
       [:style {:name name
                :style (render/style style)}]))))
 
 (def styles-container
   (comp
-   (should-subtree-update not=)
-   (stateless
+   (components/should-subtree-update not=)
+   (components/render
     (fn [s]
       (into
        [:div]
@@ -84,60 +63,44 @@
        s)))))
 
 (def scroller-
-  (stateless
-   (fn [{:keys [top height px->idx on-wheel child-cmp child-props] :as props}]
-     (let [childs-children (:children child-props)
+  (components/render
+   (fn [{:keys [point lengths set-child-range on-wheel child-cmp child-props] :as props}]
+     (let [child-children (:children child-props)
            child-props' (-> child-props
-                            (assoc :from (px->idx top)
-                                   :to   (px->idx (+ top height)))
+                            (set-child-range point lengths)
                             (dissoc :children))]
-       [:div {:component "scroller"
+       [:div {:style (render/style {:display  "flex"
+                                    :flex     "1"
+                                    :overflow :hidden})
               :on-wheel on-wheel}
-        (into [child-cmp child-props'] childs-children)]))))
+        (into [child-cmp child-props'] child-children)]))))
 
 (def list-
-  (stateless
-   (fn [{:keys [height from to map-fn]} & children]
-     (into [:div {:component "list"
-                  :style (render/style {:flex     "1"
-                                        :overflow :hidden
-                                        :height   height})}]
-           (comp (drop from)
-                 (take (- to from))
-                 (map map-fn))
+  (components/render
+   (fn [{:keys [from to attrs xform]} & children]
+     (into [:div attrs]
+           (comp (if (and from to)
+                   (comp
+                    (drop from)
+                    (take (- to from)))
+                   identity)
+                 xform)
            children))))
 
 (def rainbow
   (comp
-   (should-subtree-update
-    (constantly true))
-   (stateless
-    (fn [top height cb]
-      (let [children (apply concat
-                            (repeat 100 [[:div {:style (render/style {:height "50px"
-                                                                      :width "100%"
-                                                                      :background "red"})}]
-                                         [:div {:style (render/style {:height "50px"
-                                                                      :width "100%"
-                                                                      :background "orange"})}]
-                                         [:div {:style (render/style {:height "50px"
-                                                                      :width "100%"
-                                                                      :background "yellow"})}]
-                                         [:div {:style (render/style {:height "50px"
-                                                                      :width "100%"
-                                                                      :background "green"})}]
-                                         [:div {:style (render/style {:height "50px"
-                                                                      :width "100%"
-                                                                      :background "cyan"})}]
-                                         [:div {:style (render/style {:height "50px"
-                                                                      :width "100%"
-                                                                      :background "blue"})}]
-                                         [:div {:style (render/style {:height "50px"
-                                                                      :width "100%"
-                                                                      :background "purple"})}]]))
-            px->idx (fn [px]
-                      (quot px 50))
-            y-shift (rem top 50)
+   (components/render
+    (fn [point lengths cb]
+      (let [children (apply concat (repeat 10 [:red :orange :yellow :green :cyan :blue :purple]))
+            set-child-range (fn [child-props [_ y-cord _ :as point] [_ y-length _ :as lengths]]
+                              (assoc child-props
+                                     :from (quot y-cord 50)
+                                     :to   (quot (+ y-cord y-length) 50)))
+            y-shift (rem (second point) 50)
+            into-div (fn [color]
+                       [:div {:style (render/style {:height "50px"
+                                                    :width "100%"
+                                                    :background color})}])
             add-translate3d (fn [child]
                               (update-in child [1 :style]
                                          #(str %
@@ -145,22 +108,54 @@
                                                "translate3d(0px,"
                                                (- y-shift)
                                                "px,0px);")))]
-        [scroller- {:top top
-                    :height height
-                    :px->idx px->idx
+        [scroller- {:point point
+                    :lengths lengths
+                    :set-child-range set-child-range
                     :on-wheel cb
                     :child-cmp list-
-                    :child-props {:children children
-                                  :map-fn add-translate3d
-                                  :height height}}])))))
+                    :child-props {:attrs {:style (render/style {:flex     "1"
+                                                                :overflow :hidden})}
+                                  :children children
+                                  :xform (map (comp add-translate3d into-div))}}])))))
 
-(def editor-component
+(def editor-component-
   (comp
-   (should-subtree-update
+   (components/should-subtree-update
     (fn [[state callbacks] [state' callbacks']]
       (or (not (identical? state state'))
           (not= callbacks callbacks'))))
-   (stateless
+   (components/render
+    (fn [state {:keys [on-input on-mouse-down on-drag-selection on-resize on-scroll on-focus]} styles-map]
+      (let [viewport (:viewport state)
+            metrics (:metrics viewport)
+            {:keys [y-shift] :as viewport-info} (render/viewport-info viewport)]
+        [:div {:style (render/style {:display "flex"
+                                     :flex "1"
+                                     :cursor "text"
+                                     :outline "transparent"})}
+         [scroller- {:set-child-range (fn [c _ _] c)
+                     :on-wheel on-scroll
+                     :child-cmp list-
+                     :child-props {:attrs {:style (render/style {:background theme/background
+                                                                 :width      "100%"
+                                                                 :overflow   "hidden"})
+                                           :on-mouse-down on-mouse-down}
+                                   :children (render/viewport-lines state viewport-info)
+                                   :xform (map (fn [props]
+                                                 [:div {:key (:line-number props)
+                                                        :style (render/style {:transform (str "translate3d(0px, " y-shift "px, 0px)")})}
+                                                  [render-line props metrics]]))}}]
+         [:hidden-text-area {:on-input on-input
+                             :focused? (get-in state [:viewport :focused?])}]
+         [styles-container styles-map]])))))
+
+(def editor-component
+  (comp
+   (components/should-subtree-update
+    (fn [[state callbacks] [state' callbacks']]
+      (or (not (identical? state state'))
+          (not= callbacks callbacks'))))
+   (components/render
     (fn [state {:keys [on-input on-mouse-down on-drag-selection on-resize on-scroll on-focus]} styles-map]
       (let [viewport (:viewport state)
             metrics (:metrics viewport)
