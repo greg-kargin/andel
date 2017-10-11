@@ -147,6 +147,10 @@
                                                   [render-line props metrics]]))}}]
          [:hidden-text-area {:on-input on-input
                              :focused? (get-in state [:viewport :focused?])}]
+         [:key-listener
+          {(keyword "Backspace") (fn [] (prn "IT'S A BACKSPACE"))
+           (keyword "C-x C-c")   (fn [] (prn "IT'S A CLOSE"))
+           }]
          [styles-container styles-map]])))))
 
 (def editor-component
