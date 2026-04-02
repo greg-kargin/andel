@@ -84,4 +84,8 @@
                    :injections [(require 'pjstadig.humane-test-output)
                                 (pjstadig.humane-test-output/activate!)]
 
-                   :env {:dev true}}})
+                   :env {:dev true}}
+
+             :tui {:source-paths ["src/clj" "src/cljc"]
+                   :dependencies [[clojure-lanterna "0.9.7"]]
+                   :main andel.tui.core}})
